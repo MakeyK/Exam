@@ -2,7 +2,7 @@ const express = require('express')
 const Sequelize = require('sequelize')
 const port = 6800
 const app = express()
-app.use(express.json)
+app.use(express.json())
 const { DataTypes } = require('sequelize');
 
 const sequelize = new Sequelize(
@@ -17,11 +17,30 @@ const sequelize = new Sequelize(
 
 const Users = sequelize.define('users', {
     id_user: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    login: { type: DataTypes.STRING },
-    password: { type: DataTypes.STRING }
+    login: { type: DataTypes.STRING, unique: true },
+    password: { type: DataTypes.STRING },
+    role: { type: DataTypes.ENUM('user', 'admin'), defaultValue: 'user' }
 }, { timestamps: false })
 
-// Middleware для проверки аутентификации по логину/паролю из тела запроса
+const Profiles = sequelize.define('profiles', {
+    id_profile: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    full_name: { type: DataTypes.STRING },
+    email: { type: DataTypes.STRING, unique: true },
+    age: { type: DataTypes.INTEGER }
+}, { timestamps: false })
+
+const FavoriteProducts = sequelize.define('favorite_products', {
+    id_product: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    product_name: { type: DataTypes.STRING },
+    price: { type: DataTypes.DECIMAL(10, 2) }
+}, { timestamps: false })
+
+Users.hasOne(Profiles, { foreignKey: 'user_id' });
+Profiles.belongsTo(Users, { foreignKey: 'user_id' });
+
+Users.hasMany(FavoriteProducts, { foreignKey: 'user_id' });
+FavoriteProducts.belongsTo(Users, { foreignKey: 'user_id' });
+
 const authenticateUser = async (req, res, next) => {
     try {
         const { login, password } = req.body;
@@ -32,7 +51,6 @@ const authenticateUser = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({ message: 'Неверные учетные данные' });
         }
-        
         req.user = user;
         next();
     } catch (error) {
@@ -41,26 +59,34 @@ const authenticateUser = async (req, res, next) => {
     }
 };
 
-// Middleware для проверки ролей
-const checkRole = (roles) => {
+const checkRole = (role) => {
     return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ message: 'Пользователь не прошел проверку подлинности' });
+        if (req.user.role !== role) {
+            return res.status(403).json({ message: 'Доступ запрещен' });
         }
-        
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Недостаточные разрешения' });
-        }
-        
         next();
-    };
-};
+    }
+}
 
 app.post('/registration', async (req, res) => {
     try {
-        const { login, password } = req.body;
-        const user = await Users.create({ login, password });
-        return res.json(user);
+        const { login, password, secret_key } = req.body;
+        const role = secret_key === 'mkit' ? 'admin' : 'user';
+
+        const user = await Users.create({
+            login,
+            password,
+            role
+        });
+
+        return res.json({
+            message: 'Регистрация прошла успешно',
+            user: {
+                id: user.id_user,
+                login: user.login,
+                role: user.role
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Не удалось выполнить регистрацию' });
@@ -68,7 +94,6 @@ app.post('/registration', async (req, res) => {
 });
 
 app.post('/login', authenticateUser, async (req, res) => {
-    // После успешной аутентификации в middleware просто возвращаем пользователя
     return res.json({
         message: 'Вход в систему прошел успешно',
         user: {
@@ -78,7 +103,13 @@ app.post('/login', authenticateUser, async (req, res) => {
         }
     });
 });
+
+app.get('/admin', authenticateUser, checkRole('admin'), async (req, res) => {
+    res.json({ message: 'Добро пожаловать в админ-панель' });
+});
+
 sequelize.authenticate()
 sequelize.sync()
-
-app.listen(port)
+app.listen(port, () => {
+    console.log(`Сервер запущен на порту ${port}`);
+});
