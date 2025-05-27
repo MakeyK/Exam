@@ -109,12 +109,6 @@
                 return;
             }
             
-            // Сохраняем данные пользователя в localStorage
-            localStorage.setItem('user', JSON.stringify({
-                login: user.login,
-                role: user.role
-            }));
-            
             // Перенаправляем в зависимости от роли
             if (user.role === 'admin') {
                 window.location.href = 'admin.html';

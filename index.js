@@ -19,7 +19,7 @@ const Users = sequelize.define('users', {
     id_user: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     login: { type: DataTypes.STRING, unique: true },
     password: { type: DataTypes.STRING },
-    role: { type: DataTypes.ENUM('user', 'admin'), defaultValue: 'user' }
+    role: { type: DataTypes.STRING, defaultValue: 'user' }
 }, { timestamps: false })
 
 const Profiles = sequelize.define('profiles', {
@@ -59,34 +59,13 @@ const authenticateUser = async (req, res, next) => {
     }
 };
 
-const checkRole = (role) => {
-    return (req, res, next) => {
-        if (req.user.role !== role) {
-            return res.status(403).json({ message: 'Доступ запрещен' });
-        }
-        next();
-    }
-}
 
 app.post('/registration', async (req, res) => {
     try {
         const { login, password, secret_key } = req.body;
         const role = secret_key === 'mkit' ? 'admin' : 'user';
-
-        const user = await Users.create({
-            login,
-            password,
-            role
-        });
-
-        return res.json({
-            message: 'Регистрация прошла успешно',
-            user: {
-                id: user.id_user,
-                login: user.login,
-                role: user.role
-            }
-        });
+        const user = await Users.create({login,password,role});
+        return res.json({message: 'Регистрация прошла успешно'});
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Не удалось выполнить регистрацию' });
@@ -95,21 +74,9 @@ app.post('/registration', async (req, res) => {
 
 app.post('/login', authenticateUser, async (req, res) => {
     return res.json({
-        message: 'Вход в систему прошел успешно',
-        user: {
-            id: req.user.id_user,
-            login: req.user.login,
-            role: req.user.role
-        }
-    });
-});
-
-app.get('/admin', authenticateUser, checkRole('admin'), async (req, res) => {
-    res.json({ message: 'Добро пожаловать в админ-панель' });
+        message: 'Вход в систему прошел успешно'});
 });
 
 sequelize.authenticate()
 sequelize.sync()
-app.listen(port, () => {
-    console.log(`Сервер запущен на порту ${port}`);
-});
+app.listen(port)

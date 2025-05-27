@@ -93,12 +93,6 @@
             // Проверяем, является ли пользователь админом
             const isAdmin = secret === 'mkit';
             
-            // Сохраняем данные пользователя в localStorage
-            localStorage.setItem('user', JSON.stringify({
-                login,
-                role: isAdmin ? 'admin' : 'user'
-            }));
-            
             // Перенаправляем в зависимости от роли
             if (isAdmin) {
                 window.location.href = 'admin.html'; // Админ панель
